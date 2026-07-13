@@ -3,6 +3,7 @@ package com.exam.app.submission.service;
 import com.exam.app.endpoint.event.model.SubmissionCreatedEvent;
 import com.exam.app.file.bucket.BucketComponent;
 import com.exam.app.submission.entity.Submission;
+import com.exam.app.submission.entity.SubmissionStatus;
 import com.exam.app.submission.exception.EmptyFileException;
 import com.exam.app.submission.exception.InvalidFileTypeException;
 import com.exam.app.submission.repository.SubmissionRepository;
