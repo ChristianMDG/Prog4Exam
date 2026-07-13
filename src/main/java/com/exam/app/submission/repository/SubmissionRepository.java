@@ -2,6 +2,7 @@ package com.exam.app.submission.repository;
 
 
 import com.exam.app.submission.entity.Submission;
+import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.UUID;
 
