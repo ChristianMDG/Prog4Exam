@@ -27,10 +27,4 @@ public class GlobalExceptionHandler {
       jakarta.validation.ConstraintViolationException ex) {
     return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "Email invalide"));
   }
-
-  @ExceptionHandler(IllegalArgumentException.class)
-  public ResponseEntity<Map<String, String>> handleIllegalArgument(IllegalArgumentException ex) {
-    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-        .body(Map.of("error", "Format base64 invalide"));
-  }
 }

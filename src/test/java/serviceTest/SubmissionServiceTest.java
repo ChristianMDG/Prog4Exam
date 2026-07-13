@@ -15,13 +15,13 @@ import com.exam.app.submission.exception.InvalidFileTypeException;
 import com.exam.app.submission.repository.SubmissionRepository;
 import com.exam.app.submission.service.SubmissionCreationResult;
 import com.exam.app.submission.service.SubmissionService;
-import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.springframework.mock.web.MockMultipartFile;
 
 class SubmissionServiceTest {
 
@@ -30,9 +30,6 @@ class SubmissionServiceTest {
   @Mock private BucketComponent bucketComponent;
 
   private SubmissionService submissionService;
-
-  private static final String FAKE_IMAGE_BASE64 =
-      Base64.getEncoder().encodeToString("fake-png-bytes".getBytes());
 
   @BeforeEach
   void setUp() {
@@ -43,6 +40,9 @@ class SubmissionServiceTest {
   @Test
   void submit_shouldCreatePendingSubmission_whenImageIsValidPng() {
     // given
+    MockMultipartFile image =
+        new MockMultipartFile("image", "photo.png", "image/png", "fake-png-bytes".getBytes());
+
     when(submissionRepository.save(any(Submission.class)))
         .thenAnswer(
             invocation -> {
@@ -52,8 +52,7 @@ class SubmissionServiceTest {
             });
 
     // when
-    SubmissionCreationResult result =
-        submissionService.submit("test@example.com", "photo.png", FAKE_IMAGE_BASE64);
+    SubmissionCreationResult result = submissionService.submit("test@example.com", image);
 
     // then
     assertThat(result.submission().getStatus()).isEqualTo(SubmissionStatus.PENDING);
@@ -71,7 +70,10 @@ class SubmissionServiceTest {
   }
 
   @Test
-  void submit_shouldAcceptJpgExtension() {
+  void submit_shouldAcceptJpegContentType() {
+    MockMultipartFile image =
+        new MockMultipartFile("image", "photo.jpg", "image/jpeg", "fake-jpg-bytes".getBytes());
+
     when(submissionRepository.save(any(Submission.class)))
         .thenAnswer(
             invocation -> {
@@ -80,44 +82,31 @@ class SubmissionServiceTest {
               return s;
             });
 
-    SubmissionCreationResult result =
-        submissionService.submit("test@example.com", "photo.jpg", FAKE_IMAGE_BASE64);
+    SubmissionCreationResult result = submissionService.submit("test@example.com", image);
 
     assertThat(result.submission().getFileName()).isEqualTo("photo.jpg");
   }
 
   @Test
-  void submit_shouldAcceptJpegExtension() {
-    when(submissionRepository.save(any(Submission.class)))
-        .thenAnswer(
-            invocation -> {
-              Submission s = invocation.getArgument(0);
-              s.setId(UUID.randomUUID());
-              return s;
-            });
+  void submit_shouldThrowInvalidFileTypeException_whenContentTypeIsNotImage() {
+    MockMultipartFile file =
+        new MockMultipartFile(
+            "image", "document.pdf", "application/pdf", "fake-pdf-bytes".getBytes());
 
-    SubmissionCreationResult result =
-        submissionService.submit("test@example.com", "photo.jpeg", FAKE_IMAGE_BASE64);
-
-    assertThat(result.submission().getFileName()).isEqualTo("photo.jpeg");
-  }
-
-  @Test
-  void submit_shouldThrowInvalidFileTypeException_whenExtensionIsNotImage() {
-    assertThatThrownBy(
-            () -> submissionService.submit("test@example.com", "document.pdf", FAKE_IMAGE_BASE64))
+    assertThatThrownBy(() -> submissionService.submit("test@example.com", file))
         .isInstanceOf(InvalidFileTypeException.class)
-        .hasMessageContaining("document.pdf");
+        .hasMessageContaining("application/pdf");
 
     verifyNoInteractions(bucketComponent);
     verify(submissionRepository, never()).save(any());
   }
 
   @Test
-  void submit_shouldThrowEmptyFileException_whenDecodedBytesAreEmpty() {
-    String emptyBase64 = Base64.getEncoder().encodeToString(new byte[0]);
+  void submit_shouldThrowEmptyFileException_whenFileIsEmpty() {
+    MockMultipartFile emptyFile =
+        new MockMultipartFile("image", "empty.png", "image/png", new byte[0]);
 
-    assertThatThrownBy(() -> submissionService.submit("test@example.com", "photo.png", emptyBase64))
+    assertThatThrownBy(() -> submissionService.submit("test@example.com", emptyFile))
         .isInstanceOf(EmptyFileException.class);
 
     verifyNoInteractions(bucketComponent);
@@ -125,10 +114,9 @@ class SubmissionServiceTest {
   }
 
   @Test
-  void submit_shouldThrowIllegalArgumentException_whenBase64IsMalformed() {
-    assertThatThrownBy(
-            () -> submissionService.submit("test@example.com", "photo.png", "not-valid-base64!!!"))
-        .isInstanceOf(IllegalArgumentException.class);
+  void submit_shouldThrowEmptyFileException_whenFileIsNull() {
+    assertThatThrownBy(() -> submissionService.submit("test@example.com", null))
+        .isInstanceOf(EmptyFileException.class);
   }
 
   @Test
