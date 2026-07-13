@@ -3,33 +3,31 @@ package com.exam.app.submission.controller;
 import com.exam.app.endpoint.event.EventProducer;
 import com.exam.app.endpoint.event.model.SubmissionCreatedEvent;
 import com.exam.app.submission.dto.SubmissionResponse;
+import com.exam.app.submission.dto.SubmitRequest;
 import com.exam.app.submission.entity.Submission;
 import com.exam.app.submission.service.SubmissionCreationResult;
 import com.exam.app.submission.service.SubmissionService;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.Valid;
 import java.util.List;
 import lombok.AllArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/submission")
 @AllArgsConstructor
-@Validated
 public class SubmissionController {
 
   private final SubmissionService submissionService;
   private final EventProducer<SubmissionCreatedEvent> eventProducer;
 
-  @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-  public ResponseEntity<SubmissionResponse> submit(
-      @RequestParam @NotBlank @Email String email, @RequestParam MultipartFile image) {
+  @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
+  public ResponseEntity<SubmissionResponse> submit(@Valid @RequestBody SubmitRequest request) {
 
-    SubmissionCreationResult result = submissionService.submit(email, image);
+    SubmissionCreationResult result =
+        submissionService.submit(
+            request.getEmail(), request.getFileName(), request.getImageBase64());
     Submission submission = result.submission();
 
     eventProducer.accept(List.of(result.event()));
