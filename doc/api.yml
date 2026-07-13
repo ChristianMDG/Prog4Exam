@@ -1,0 +1,204 @@
+openapi: 3.0.3
+info:
+  title: API de Soumission d'Image
+  description: >
+    API permettant de soumettre une image (PNG/JPG) accompagnée d'un email.
+    L'image est convertie en noir et blanc de manière asynchrone, stockée sur S3,
+    et un email de confirmation est envoyé avec le lien de téléchargement.
+  version: 1.0.0
+
+servers:
+  - url: /api
+    description: API de base
+
+tags:
+  - name: Submission
+    description: Soumission et consultation des images traitées
+
+paths:
+  /submission:
+    post:
+      tags:
+        - Submission
+      summary: Soumettre une image pour traitement
+      description: >
+        Reçoit un email et une image (PNG ou JPG), crée un enregistrement en statut PENDING,
+        puis déclenche un traitement asynchrone (conversion N&B + upload S3 + email de confirmation).
+      operationId: submitImage
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - email
+                - image
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: Adresse email du soumissionnaire
+                  example: jean.dupont@email.com
+                image:
+                  type: string
+                  format: binary
+                  description: Fichier image à traiter, PNG ou JPG uniquement
+      responses:
+        '200':
+          description: Soumission enregistrée avec succès (traitement en cours en asynchrone)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmissionResponse'
+              examples:
+                success:
+                  value:
+                    id: "550e8400-e29b-41d4-a716-446655440000"
+                    fileName: "photo.png"
+                    email: "jean.dupont@email.com"
+                    status: "PENDING"
+                    processedImageUrl: null
+                    submissionDate: "2026-07-13T10:30:00Z"
+        '400':
+          description: Requête invalide (fichier vide, type non supporté, email invalide)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidFileType:
+                  summary: Type de fichier non supporté
+                  value:
+                    error: "Type de fichier non supporté (application/pdf), PNG ou JPG uniquement"
+                emptyFile:
+                  summary: Fichier vide ou absent
+                  value:
+                    error: "Le fichier image est vide ou absent"
+                invalidEmail:
+                  summary: Email invalide
+                  value:
+                    error: "Email invalide"
+        '500':
+          description: Erreur inattendue côté serveur
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      tags:
+        - Submission
+      summary: Lister toutes les soumissions
+      description: Retourne toutes les soumissions enregistrées, quel que soit leur statut.
+      operationId: getAllSubmissions
+      responses:
+        '200':
+          description: Liste des soumissions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SubmissionResponse'
+              examples:
+                list:
+                  value:
+                    - id: "550e8400-e29b-41d4-a716-446655440000"
+                      fileName: "photo.png"
+                      email: "jean.dupont@email.com"
+                      status: "CONFIRMED"
+                      processedImageUrl: "https://bucket.s3.amazonaws.com/processed/550e8400....png?X-Amz-Signature=..."
+                      submissionDate: "2026-07-13T10:30:00Z"
+                    - id: "660e8400-e29b-41d4-a716-446655440001"
+                      fileName: "photo2.jpg"
+                      email: "marie.curie@email.com"
+                      status: "PENDING"
+                      processedImageUrl: null
+                      submissionDate: "2026-07-13T10:35:00Z"
+        '500':
+          description: Erreur inattendue côté serveur
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /submission/{id}:
+    get:
+      tags:
+        - Submission
+      summary: Consulter une soumission par son ID
+      description: >
+        Endpoint bonus (non demandé explicitement dans le sujet, mais cohérent avec le pattern
+        REST habituel) — utile pour vérifier le statut d'une soumission précise sans tout lister.
+      operationId: getSubmissionById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Identifiant de la soumission
+      responses:
+        '200':
+          description: Soumission trouvée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmissionResponse'
+        '404':
+          description: Soumission introuvable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                notFound:
+                  value:
+                    error: "Submission introuvable: 550e8400-e29b-41d4-a716-446655440000"
+
+components:
+  schemas:
+    SubmissionStatus:
+      type: string
+      description: >
+        PENDING : soumission créée, traitement asynchrone pas encore terminé.
+        CONFIRMED : image convertie, uploadée sur S3, email envoyé.
+      enum:
+        - PENDING
+        - CONFIRMED
+
+    SubmissionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        fileName:
+          type: string
+          example: "photo.png"
+        email:
+          type: string
+          format: email
+          example: "jean.dupont@email.com"
+        status:
+          $ref: '#/components/schemas/SubmissionStatus'
+        processedImageUrl:
+          type: string
+          nullable: true
+          description: URL présignée S3 vers l'image traitée, valable 7 jours. Null tant que le statut est PENDING.
+          example: "https://bucket.s3.amazonaws.com/processed/550e8400....png?X-Amz-Signature=..."
+        submissionDate:
+          type: string
+          format: date-time
+          example: "2026-07-13T10:30:00Z"
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Message d'erreur explicite destiné à l'utilisateur ou au développeur front
+          example: "Type de fichier non supporté (application/pdf), PNG ou JPG uniquement"
