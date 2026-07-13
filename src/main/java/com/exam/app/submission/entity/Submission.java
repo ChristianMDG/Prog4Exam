@@ -1,10 +1,10 @@
 package com.exam.app.submission.entity;
 
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
 import java.time.Instant;
 import java.util.UUID;
+import lombok.Getter;
+import lombok.Setter;
 
 @Entity
 @Table(name = "submission")
@@ -12,22 +12,22 @@ import java.util.UUID;
 @Setter
 public class Submission {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.UUID)
+  private UUID id;
 
-    @Column(nullable = false)
-    private String fileName;
+  @Column(nullable = false)
+  private String fileName;
 
-    @Column(nullable = false)
-    private String email;
+  @Column(nullable = false)
+  private String email;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private SubmissionStatus status;
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false)
+  private SubmissionStatus status;
 
-    private String processedImageUrl;
+  private String processedImageUrl;
 
-    @Column(nullable = false)
-    private Instant submissionDate;
+  @Column(nullable = false)
+  private Instant submissionDate;
 }
